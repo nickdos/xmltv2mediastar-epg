@@ -15,15 +15,16 @@ use Data::Dumper;
 
 our ($programmes_ref, $channels_ref);    # global variables
 my $EPG_file_name = "ICE_EPG.DAT";
-
-my $twig = new XML::Twig( keep_encoding => 1, 
-                          twig_handlers => { channel   => \&channel,
+my $debug = 0;
+my $twig  = new XML::Twig( keep_encoding => 1, 
+                           twig_handlers => { channel   => \&channel,
                                              programme => \&programme,
-                                           },
+                                            },
                          );
 
 $twig->parsefile( $ARGV[0] );    # build the twig
 
+print Dumper($programmes_ref) if $debug;
 print "Total programmes = ", $#{ $programmes_ref } + 1, "\n";
 
 my $EPG_data = format_EPG($programmes_ref);
@@ -45,18 +46,20 @@ sub channel {
     my $channel_ref;
     my %LCN = ( '2'     => '0002',
                 '2-2'   => '0021',
+                'ABC2'  => '0021',
                 '7'     => '0006,0007',
                 '9'     => '0008,0009',
                 '10a'   => '0005,0010',
                 '10'    => '0010,0005',
                 'SBS'   => '0003,1283',
                 'SBS-2' => '0033,1281',
+                'SBSD'  => '0033,1281',
                );
                                 
     my $id     = $channel->att('id');
-    my $LCN_id = (split /\./, $id)[2];  # e.g. freesd.Canberra.2 -> 2
+    my $LCN_id = (split /\./, $id)[2] || $id;  # e.g. freesd.Canberra.2 -> 2
     my $name   = $channel->first_child('display-name')->text;
-    $channels_ref->{$id} = $LCN{$LCN_id};
+    $channels_ref->{$id} = $LCN{$LCN_id} if (exists $LCN{$LCN_id});
     
     $t->purge;
 }
@@ -65,8 +68,8 @@ sub programme {
     #
     # parse the programme GI and add to the data structure $programmes_ref
     #
-    my( $t, $programme) = @_; # all handlers get called with those arguments
-    my $prog_ref;
+    my ($t, $programme) = @_; # all handlers get called with those arguments
+    my ($prog_ref, $gtm_flag);
     
     $prog_ref->{channel}   = $programme->att('channel');
     $prog_ref->{start}     = $programme->att('start');
@@ -85,13 +88,16 @@ sub programme {
                              if $programme->first_child('video');
     $prog_ref->{subtitles} = ($programme->first_child('subtitles')) ? 2 : 0;
     
+    
     $prog_ref->{unix_start} = date2epoch($prog_ref->{start});
-    $prog_ref->{gmt_start}  = POSIX::strftime("%Y%m%d%H%M%S", (gmtime $prog_ref->{unix_start}));
-    @{ $prog_ref->{gmt_start_list} }  = gmtime($prog_ref->{unix_start});
     $prog_ref->{unix_stop}  = date2epoch($prog_ref->{stop});
     $prog_ref->{duration}   = ($prog_ref->{unix_stop} - $prog_ref->{unix_start}) / 60;
     
-    $prog_ref->{channel_name} = $channels_ref->{$prog_ref->{channel}};
+    @{ $prog_ref->{gmt_start_list} }  = gmtime($prog_ref->{unix_start});
+    $prog_ref->{gmt_start}  = POSIX::strftime("%Y%m%d%H%M%S", 
+                                  (gmtime $prog_ref->{unix_start}));
+
+    $prog_ref->{channel_lcn} = $channels_ref->{$prog_ref->{channel}};
     
     push @{ $programmes_ref }, $prog_ref;    # add it to the global array ref
 
@@ -107,11 +113,12 @@ sub format_EPG {
     my ($epg);
     
     for my $p (@{ $data }) {
-        $epg .= convert_epg_date(@{ $p->{gmt_start_list} }) . "\t";  # col 1
-       #$epg .= $p->{gmt_start}                             . "\t";  # col 1
-        my $ice_id = (split /\,/, $p->{channel_name})[0];
+        next if !$p->{channel_lcn};    # skip channels not defined with LCN
+       #$epg .= convert_epg_date(@{ $p->{gmt_start_list} }) . "\t";  # col 1
+        $epg .= encode($p->{gmt_start})                     . "\t";  # col 1
+        my $ice_id = (split /\,/, $p->{channel_lcn})[0];
         $epg .= sprintf("%d", $ice_id)                      . "\t";  # col 2
-        $epg .= $p->{channel_name}                          . "\t";  # col 3
+        $epg .= $p->{channel_lcn}                          . "\t";  # col 3
         $epg .= get_event_id($p->{title})                   . "\t";  # col 4
         $epg .= $p->{duration}                              . "\t";  # col 5
         $epg .= ($p->{title}) ? $p->{title}. "\t" :           "\t";  # col 6
@@ -175,6 +182,12 @@ sub encode {
         $output .= $code{$i};
     }
     
+    if (length $output eq 14) {
+        # if full time is passed, don't code the beginning 2 and last 0
+        $output =~ s/^./2/;
+        $output =~ s/.$/0/;
+    }
+    
     return $output;
 }
 
@@ -184,11 +197,12 @@ sub date2epoch {
     #
     my ($date)     = @_;
     my $epoch_date = 0;
-    my $date_str;
+    my ($date_str);
     
     if ($date =~ /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/) {
         $date_str = "$1-$2-$3T$4:$5:$6";    # standard internet format
-    } else {
+    }
+    else {
         die "Date format not recognised: $date.\n";
     }
     
