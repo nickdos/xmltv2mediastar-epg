@@ -1,0 +1,14 @@
+XMLTV2Mediastar-EPG
+-------------------
+
+This project started with a single Perl script that converts XMLTV data to
+the EPG (electronic programme guide) data file format used by the Mediastar 
+DT-920PVR and DT-820PVR.
+
+The Perl script can be found in the Perl directory. A Java version is planned 
+but has not been written yet.
+
+This software is made freely available under the Gnu Public License (GPL) 
+version 2.
+
+Nick dos Remedios (nickdos at gmail.com), August 2006.

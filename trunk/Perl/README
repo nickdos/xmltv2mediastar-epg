@@ -1,0 +1,29 @@
+XMLTV2Mediastar-EPG
+-------------------
+
+This project started with a single Perl script that converts XMLTV data to
+the EPG (electronic programme guide) data file format used by the Mediastar 
+DT-920PVR and DT-820PVR.
+
+The Perl script requires the following pre-requisites to run:
+
+- Perl 5.6 or later (Windows users try ActivePerl)
+- Expat XML parser (http://expat.sourceforge.net/) 
+- XML::Parser module from cpan.org
+- XML::Twig module from cpan.org
+- Date::Parse module from cpan.org
+
+To run the script via the command line:
+
+  $ ./xmltv2epg.pl xmltv.xml
+  
+where xmltv.xml is the input XMLTV file containing TV guide data.
+
+Sources for XMLTV data in Australia can be found on:
+
+  http://www.cse.unsw.edu.au/~willu/xmltv/index.html
+
+This software is made freely available under the Gnu Public License (GPL) 
+version 2.
+
+Nick dos Remedios (nickdos at gmail.com), August 2006.
