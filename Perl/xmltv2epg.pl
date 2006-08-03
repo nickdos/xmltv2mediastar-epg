@@ -107,8 +107,8 @@ sub format_EPG {
     my ($epg);
     
     for my $p (@{ $data }) {
-       #$epg .= convert_epg_date(@{ $p->{gmt_start_list} }) . "\t";  # col 1
-        $epg .= $p->{gmt_start}                             . "\t";  # col 1
+        $epg .= convert_epg_date(@{ $p->{gmt_start_list} }) . "\t";  # col 1
+       #$epg .= $p->{gmt_start}                             . "\t";  # col 1
         my $ice_id = (split /\,/, $p->{channel_name})[0];
         $epg .= sprintf("%d", $ice_id)                      . "\t";  # col 2
         $epg .= $p->{channel_name}                          . "\t";  # col 3
