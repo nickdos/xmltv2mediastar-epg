@@ -15,10 +15,10 @@ use Data::Dumper;
 
 our ($programmes_ref, $channels_ref);    # global variables
 my $EPG_file_name = "ICE_EPG.DAT";
-my $debug = 0;
+my $debug = 0;    # print out debugging when set to true (1) 
 my $twig  = new XML::Twig( keep_encoding => 1, 
                            twig_handlers => { channel   => \&channel,
-                                             programme => \&programme,
+                                              programme => \&programme,
                                             },
                          );
 
@@ -27,16 +27,24 @@ $twig->parsefile( $ARGV[0] );    # build the twig
 print Dumper($programmes_ref) if $debug;
 print "Total programmes = ", $#{ $programmes_ref } + 1, "\n";
 
+# format the data for the output file
 my $EPG_data = format_EPG($programmes_ref);
 
 if (-e $EPG_file_name) {
-    # output file  already exists
+    # output file  already exists, so rename it
     rename $EPG_file_name, "$EPG_file_name.$$";
 }
 
+# print it to file (in current directory)
 open EPG, "> $EPG_file_name" or die "Can't write to output file $EPG_file_name: $!\n";
 print EPG $EPG_data, "\n";
 close EPG or die "Can't close EPG filehandle: $!\n";
+
+###############################################################################
+#
+# Subroutines go here
+#
+###############################################################################
 
 sub channel {
     #
@@ -45,15 +53,22 @@ sub channel {
     my( $t, $channel) = @_;
     my $channel_ref;
     my %LCN = ( '2'     => '0002',
+                '57'    => '0002',        # ICE id
                 '2-2'   => '0021',
                 'ABC2'  => '0021',
+                '58'    => '0021',        # ICE id
                 '7'     => '0006,0007',
+                '56'    => '0006,0007',   # ICE id
                 '9'     => '0008,0009',
+                '54'    => '0008,0009',   # ICE id
                 '10a'   => '0005,0010',
                 '10'    => '0010,0005',
+                '55'    => '0010,0005',   # ICE id
                 'SBS'   => '0003,1283',
+                '59'    => '0003,1283',   # ICE id
                 'SBS-2' => '0033,1281',
                 'SBSD'  => '0033,1281',
+                '60'    => '0033,1281',   # ICE id
                );
                                 
     my $id     = $channel->att('id');
@@ -74,29 +89,17 @@ sub programme {
     $prog_ref->{channel}   = $programme->att('channel');
     $prog_ref->{start}     = $programme->att('start');
     $prog_ref->{stop}      = $programme->att('stop');
-    $prog_ref->{title}     = $programme->first_child('title')->text
-                             if $programme->first_child('title');
-    $prog_ref->{subtitle}  = $programme->first_child('sub-title')->text
-                             if $programme->first_child('sub-title');
-    $prog_ref->{desc}      = $programme->first_child('desc')->text
-                             if $programme->first_child('desc');
-    $prog_ref->{rating}    = $programme->first_child('rating')->first_child('value')->text
-                             if $programme->first_child('rating');
-    $prog_ref->{category}  = $programme->first_child('category')->text
-                             if $programme->first_child('category');
-    $prog_ref->{aspect}    = $programme->first_child('video')->first_child('aspect')->text
-                             if $programme->first_child('video');
+    $prog_ref->{title}     = $programme->first_child(/^title/)->text;
+    $prog_ref->{subtitle}  = $programme->first_child(/sub-title/)->text;
+    $prog_ref->{desc}      = $programme->first_child(/desc/)->text;
+    $prog_ref->{rating}    = $programme->first_child(/rating/)->first_child(/value/)->text;
+    $prog_ref->{category}  = $programme->first_child(/category/)->text;
+    $prog_ref->{aspect}    = $programme->first_child(/video/)->first_child(/aspect/)->text;
     $prog_ref->{subtitles} = ($programme->first_child('subtitles')) ? 2 : 0;
     
+    ($prog_ref->{gmt_start},
+     $prog_ref->{duration})  = get_times($prog_ref->{start}, $prog_ref->{stop});
     
-    $prog_ref->{unix_start} = date2epoch($prog_ref->{start});
-    $prog_ref->{unix_stop}  = date2epoch($prog_ref->{stop});
-    $prog_ref->{duration}   = ($prog_ref->{unix_stop} - $prog_ref->{unix_start}) / 60;
-    
-    @{ $prog_ref->{gmt_start_list} }  = gmtime($prog_ref->{unix_start});
-    $prog_ref->{gmt_start}  = POSIX::strftime("%Y%m%d%H%M%S", 
-                                  (gmtime $prog_ref->{unix_start}));
-
     $prog_ref->{channel_lcn} = $channels_ref->{$prog_ref->{channel}};
     
     push @{ $programmes_ref }, $prog_ref;    # add it to the global array ref
@@ -114,7 +117,6 @@ sub format_EPG {
     
     for my $p (@{ $data }) {
         next if !$p->{channel_lcn};    # skip channels not defined with LCN
-       #$epg .= convert_epg_date(@{ $p->{gmt_start_list} }) . "\t";  # col 1
         $epg .= encode($p->{gmt_start})                     . "\t";  # col 1
         my $ice_id = (split /\,/, $p->{channel_lcn})[0];
         $epg .= sprintf("%d", $ice_id)                      . "\t";  # col 2
@@ -124,7 +126,6 @@ sub format_EPG {
         $epg .= ($p->{title}) ? $p->{title}. "\t" :           "\t";  # col 6
         $epg .= ($p->{subtitle}) ? $p->{subtitle}. "\t" :     "\t";  # col 7
         $epg .= ($p->{category}) ? category_to_num($p->{category}) . "\t" :  "\t";  # col 8
-       #$epg .= ($p->{category}) ? $p->{category} . "\t" :    "\t";  # col 8
         $epg .= "1\t";                                               # col 9
         $epg .= "1\t";                                               # col 10
         $epg .= "1\t";                                               # col 11
@@ -191,23 +192,42 @@ sub encode {
     return $output;
 }
 
-sub date2epoch {
+sub get_times {
     #
-    # Convert date as 20060808002500 to unixtime
+    # process the start, stop and durations times
     #
-    my ($date)     = @_;
-    my $epoch_date = 0;
-    my ($date_str);
+    my (%input_time, %dates);
+    ($input_time{start}, $input_time{stop}) = @_;
+    my ($gmt_time, $is_gmt, $duration);
     
-    if ($date =~ /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/) {
-        $date_str = "$1-$2-$3T$4:$5:$6";    # standard internet format
+    for my $key (keys %input_time) {
+        if ($input_time{$key} =~ /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s+\+(\d{4})/) {
+            # e.g. "20060805142000 +0000" or "20060805142000 +1000"
+            $dates{$key} = str2time("$1-$2-$3T$4:$5:$6");    # standard internet format
+            my $gmt_offset  = "$7";
+            $is_gmt = ($gmt_offset eq "0000") ? 1 : 0;
+        }
+        elsif ($input_time{$key} =~ /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/) {
+            # e.g. "20060805142000"
+            $dates{$key} = str2time("$1-$2-$3T$4:$5:$6");    # standard internet format
+        }
+        else {
+            die "Date format not recognised: $input_time{$key}.\n";
+        }
+    }
+    
+    $duration = ($dates{stop} - $dates{start}) / 60;
+    
+    if ($is_gmt) {
+        # GMT times -> use localtime conversion
+        $gmt_time = POSIX::strftime("%Y%m%d%H%M%S", (localtime $dates{start}));
     }
     else {
-        die "Date format not recognised: $date.\n";
+        # Local times -> use gmtime conversion
+        $gmt_time = POSIX::strftime("%Y%m%d%H%M%S", (gmtime $dates{start}));
     }
     
-    $epoch_date = str2time($date_str);
-    return $epoch_date;
+    return ($gmt_time, $duration);
 }
 
 sub get_event_id {
@@ -217,10 +237,9 @@ sub get_event_id {
     my ($title) = @_;
     
     no warnings ;
-    my $id;
     my $digest = md5_hex($title);
-    my $hex = hex($digest);
-    $id = substr $hex, 2, 5;
+    my $hex    = hex($digest);
+    my $id     = substr $hex, 2, 5;
     
     return $id;
 }
@@ -246,14 +265,35 @@ sub category_to_num {
     my ($input) = @_;
     my $output = 1;
     $input = lc $input;    # force upper case
-    # 0(unrated) 9 (PG) 12 (MA) 15(AV) 18(AV)
-    my %categories = ( 'movie' => "0x10", 'drama' => 1, 'childrens' => 1, 'music' => 1, 
-                       'documentary' => 1, 'game show' => 1, 'news' => 1, 'food' => 1,
-                       'shopping' => 1, 'comedy' => 1, 'soap' => 1, 'lifestyle' => 1,
-                       'current affairs' => 1, 'religion' => 1, 'entertainment' => 1, 
-                       'reality' => 1, 'science and technology' => 1);
-    my $category = hex($categories{$input}) if $categories{$input};
-    $output = ($category) ? $category: $output;
+    # Categories - ETSI EN 300 468 V1.7.1 table 28
+    # http://webapp.etsi.org/action/OP/OP20060428/en_300468v010701o.pdf
+    # combined fields 1 & 2 as hex
+    my %categories = ( 'movie'         => '0x10', 'game show'  => '0x30',
+                       'drama'         => '0x10', 'news'       => '0x20',
+                       'childrens'     => '0x50', 'food'       => '0xA5',
+                       'music'         => '0x60', 'comedy'     => '0x14',
+                       'documentary'   => '0x23', 'soap'       => '0x15',  
+                       'shopping'      => '0xA6', 'lifestyle'  => '0xA0',
+                       'religion'      => '0x73', 'sport'      => '0x40',
+                       'entertainment' => '0x32', 'travel'     => '0xA1', 
+                       'reality'       => '0x34', 'business'   => '0x22',
+                       'educational'   => '0x54', 'arts'       => '0x70',
+                       'fantasy'       => '0x13', 'talk show'  => '0x33',
+                       'action'        => '0x12', 'nature'     => '0x91', 
+                       'crime'         => '0x11',      
+                       'science and technology' => '0x92',
+                       'current affairs'        => '0x20',
+                     );
+    
+    if (! exists $categories{$input}) {
+        warn "Unrecognised category: $input\n" if $debug;
+    }
+    else {
+        # convert hex to decimal
+        my $category = hex($categories{$input});
+        $output = ($category) ? $category : $output;
+    }
+    
     return $output;
 }
 
