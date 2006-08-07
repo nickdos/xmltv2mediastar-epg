@@ -11,12 +11,15 @@ use XML::Twig;
 use Date::Parse;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use POSIX qw(strftime);
+use HTML::Entities;
 use Data::Dumper;
 
 our ($programmes_ref, $channels_ref);    # global variables
 my $EPG_file_name = "ICE_EPG.DAT";
 my $debug = 0;    # print out debugging when set to true (1) 
-my $twig  = new XML::Twig( keep_encoding => 1, 
+#my $conv  = XML::Twig::encode_convert( 'latin1');
+my $twig  = new XML::Twig( keep_encoding => 1,
+                          #output_filter => $conv,
                            twig_handlers => { channel   => \&channel,
                                               programme => \&programme,
                                             },
@@ -86,24 +89,34 @@ sub programme {
     my ($t, $programme) = @_; # all handlers get called with those arguments
     my ($prog_ref, $gtm_flag);
     
+    # Get values for the XML fields...
     $prog_ref->{channel}   = $programme->att('channel');
     $prog_ref->{start}     = $programme->att('start');
     $prog_ref->{stop}      = $programme->att('stop');
-    $prog_ref->{title}     = $programme->first_child(/^title/)->text;
-    $prog_ref->{subtitle}  = $programme->first_child(/sub-title/)->text;
-    $prog_ref->{desc}      = $programme->first_child(/desc/)->text;
-    $prog_ref->{rating}    = $programme->first_child(/rating/)->first_child(/value/)->text;
-    $prog_ref->{category}  = $programme->first_child(/category/)->text;
-    $prog_ref->{aspect}    = $programme->first_child(/video/)->first_child(/aspect/)->text;
-    $prog_ref->{subtitles} = ($programme->first_child('subtitles')) ? 2 : 0;
+    $prog_ref->{title}     = $programme->trimmed_field('title');
+    $prog_ref->{sub_title} = $programme->trimmed_field('sub-title');
+    $prog_ref->{desc}      = $programme->first_child('desc')->xml_text;
+    $prog_ref->{rating}    = $programme->first_child('rating')->first_child('value')->xml_text;
+    $prog_ref->{category}  = $programme->trimmed_field('category');
+   #$prog_ref->{aspect}    = $programme->first_child(qr/video/)->first_child(qr/aspect/)->text;
+    $prog_ref->{subtitles} = ($programme->trimmed_field('subtitles')) ? 2 : 0;
     
+    # Generate some of the extra "output" fields...    
     ($prog_ref->{gmt_start},
      $prog_ref->{duration})  = get_times($prog_ref->{start}, $prog_ref->{stop});
-    
+    $prog_ref->{epg_start}   = encode($prog_ref->{gmt_start});
+    $prog_ref->{title}       = substr(decode_entities($prog_ref->{title}), 0, 39);    # only grab first 30 characters
+    $prog_ref->{sub_title}   = decode_entities($prog_ref->{sub_title});
+    $prog_ref->{desc}        = decode_entities($prog_ref->{desc});
     $prog_ref->{channel_lcn} = $channels_ref->{$prog_ref->{channel}};
+    $prog_ref->{ice_id}      = (split /\,/, $prog_ref->{channel_lcn})[0] if $prog_ref->{channel_lcn};
+    $prog_ref->{ice_id}      = sprintf("%d", $prog_ref->{ice_id})        if $prog_ref->{channel_lcn};
+    $prog_ref->{event_id}    = get_event_id($prog_ref->{title});
+    $prog_ref->{category}    = category_to_num($prog_ref->{category});
+    $prog_ref->{rating}      = rating_to_num($prog_ref->{rating});
     
     push @{ $programmes_ref }, $prog_ref;    # add it to the global array ref
-
+    #print Dumper("programme", $prog_ref);
     $t->purge;
 }
 
@@ -117,22 +130,21 @@ sub format_EPG {
     
     for my $p (@{ $data }) {
         next if !$p->{channel_lcn};    # skip channels not defined with LCN
-        $epg .= encode($p->{gmt_start})                     . "\t";  # col 1
-        my $ice_id = (split /\,/, $p->{channel_lcn})[0];
-        $epg .= sprintf("%d", $ice_id)                      . "\t";  # col 2
-        $epg .= $p->{channel_lcn}                          . "\t";  # col 3
-        $epg .= get_event_id($p->{title})                   . "\t";  # col 4
+        $epg .= $p->{epg_start}                             . "\t";  # col 1
+        $epg .= $p->{ice_id}                                . "\t";  # col 2
+        $epg .= $p->{channel_lcn}                           . "\t";  # col 3
+        $epg .= $p->{event_id}                              . "\t";  # col 4
         $epg .= $p->{duration}                              . "\t";  # col 5
-        $epg .= ($p->{title}) ? $p->{title}. "\t" :           "\t";  # col 6
-        $epg .= ($p->{subtitle}) ? $p->{subtitle}. "\t" :     "\t";  # col 7
-        $epg .= ($p->{category}) ? category_to_num($p->{category}) . "\t" :  "\t";  # col 8
+        $epg .= ($p->{title})    ? $p->{title}      . "\t" :  "\t";  # col 6
+        $epg .= ($p->{sub_title}) ? $p->{sub_title} . "\t" :  "\t";  # col 7
+        $epg .= ($p->{category}) ? $p->{category}   . "\t" :  "\t";  # col 8
         $epg .= "1\t";                                               # col 9
         $epg .= "1\t";                                               # col 10
         $epg .= "1\t";                                               # col 11
         $epg .= "1\t";                                               # col 12
         $epg .= "1\t";                                               # col 13
-        $epg .= ($p->{rating}) ? rating_to_num($p->{rating}) . "\t" : "\t";  # col 14
-        $epg .= ($p->{desc}) ? $p->{desc} . "\t"                    : "\t";  # col 15
+        $epg .= ($p->{rating}) ? $p->{rating}       . "\t" :  "\t";  # col 14
+        $epg .= ($p->{desc})   ? $p->{desc}         . "\t" :  "\t";  # col 15
         $epg .= "\n";
     }
     
@@ -286,7 +298,7 @@ sub category_to_num {
                      );
     
     if (! exists $categories{$input}) {
-        warn "Unrecognised category: $input\n" if $debug;
+        warn "Unrecognised category: $input\n" if 0;
     }
     else {
         # convert hex to decimal
