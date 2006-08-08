@@ -7,12 +7,10 @@
 # version 0.01, NdR 02 Aug 2006
 #
 use strict;
-#use XML::Twig;
 use XML::Simple;
 use Date::Parse;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use POSIX qw(strftime);
-require Encode;
 use Data::Dumper;
 
 my $EPG_file_name = "ICE_EPG.DAT";
@@ -28,7 +26,7 @@ print "Total programmes = ", $#{ $programmes_ref } + 1, "\n";
 
 # format the data for the output file
 my $EPG_data = format_EPG($programmes_ref);
-#$EPG_data    = Encode::decode( 'UTF-8', $EPG_data );
+
 if (-e $EPG_file_name) {
     # output file  already exists, so rename it
     rename $EPG_file_name, "$EPG_file_name.$$";
@@ -86,7 +84,6 @@ sub munge_programme {
 
     for my $p (@{ $p_ref }) {
         # Get values for the XML fields...
-        #print Dumper($p);
         my $prog_ref;
         $prog_ref->{channel}   = $p->{channel};    # attribute
         $prog_ref->{start}     = $p->{start};      # attribute
@@ -118,19 +115,17 @@ sub munge_programme {
         $prog_ref->{desc}        = $prog_ref->{desc};
         $prog_ref->{channel}     = (split /\./, $prog_ref->{channel})[2] || $prog_ref->{channel};
         $prog_ref->{lcn}         = $lcn_ref->{$prog_ref->{channel}};
-        # todo ice_id from data first
         $prog_ref->{ice_id}      = (split /\,/, $prog_ref->{lcn})[0]  if $prog_ref->{lcn};
         $prog_ref->{ice_id}      = sprintf("%d", $prog_ref->{ice_id}) if $prog_ref->{lcn};
         $prog_ref->{event_id}    = ($prog_ref->{event_id}) 
                                      ? $prog_ref->{event_id}              # IceTV data
-                                     : get_event_id($prog_ref->{title});  # other
+                                     : get_event_id($prog_ref->{title});  # others
         $prog_ref->{category}    = category_to_num($prog_ref->{category});
         $prog_ref->{rating}      = rating_to_num($prog_ref->{rating});
-        #print Dumper($prog_ref);
-
+        
         push @{ $all_p_ref }, $prog_ref;   # add it to the array ref
     }
-    #print Dumper($all_p_ref);
+    
     return $all_p_ref;
 }
 
@@ -206,6 +201,7 @@ sub encode {
     my @digits = split //, $input;
     
     for my $i (@digits)  {
+        # substitute the letter code for each number
         $output .= $code{$i};
     }
     
