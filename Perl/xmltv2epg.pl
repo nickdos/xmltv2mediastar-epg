@@ -7,39 +7,36 @@
 # version 0.01, NdR 02 Aug 2006
 #
 use strict;
-use XML::Twig;
+#use XML::Twig;
+use XML::Simple;
 use Date::Parse;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use POSIX qw(strftime);
-use HTML::Entities;
+require Encode;
 use Data::Dumper;
 
-our ($programmes_ref, $channels_ref);    # global variables
 my $EPG_file_name = "ICE_EPG.DAT";
 my $debug = 0;    # print out debugging when set to true (1) 
-#my $conv  = XML::Twig::encode_convert( 'latin1');
-my $twig  = new XML::Twig( keep_encoding => 1,
-                          #output_filter => $conv,
-                           twig_handlers => { channel   => \&channel,
-                                              programme => \&programme,
-                                            },
-                         );
 
-$twig->parsefile( $ARGV[0] );    # build the twig
+my $xs        = new XML::Simple( ForceArray => 1 );   # ForceArray => 1
+my $xmltv_ref = $xs->XMLin( $ARGV[0] );
 
-print Dumper($programmes_ref) if $debug;
+my $programmes_ref = munge_programme($xmltv_ref->{programme});
+
+#print Dumper($xmltv_ref) if 1;
 print "Total programmes = ", $#{ $programmes_ref } + 1, "\n";
 
 # format the data for the output file
 my $EPG_data = format_EPG($programmes_ref);
-
+#$EPG_data    = Encode::decode( 'UTF-8', $EPG_data );
 if (-e $EPG_file_name) {
     # output file  already exists, so rename it
     rename $EPG_file_name, "$EPG_file_name.$$";
 }
 
 # print it to file (in current directory)
-open EPG, "> $EPG_file_name" or die "Can't write to output file $EPG_file_name: $!\n";
+#open EPG, "> $EPG_file_name" or die "Can't write to output file $EPG_file_name: $!\n";
+open EPG, ">:utf8", $EPG_file_name or die "Can't write to output file $EPG_file_name: $!\n";
 print EPG $EPG_data, "\n";
 close EPG or die "Can't close EPG filehandle: $!\n";
 
@@ -49,75 +46,92 @@ close EPG or die "Can't close EPG filehandle: $!\n";
 #
 ###############################################################################
 
-sub channel {
+sub get_lcn {
     #
-    # get a mapping for XMLTV channel IDs and LCN for Mediastar EPG
+    # Channel name to LCN mapping
     #
-    my( $t, $channel) = @_;
-    my $channel_ref;
-    my %LCN = ( '2'     => '0002',
+    my $LCN = { '2'     => '0002',
                 '57'    => '0002',        # ICE id
                 '2-2'   => '0021',
                 'ABC2'  => '0021',
                 '58'    => '0021',        # ICE id
                 '7'     => '0006,0007',
+                'PrimS' => '0006,0007',
                 '56'    => '0006,0007',   # ICE id
                 '9'     => '0008,0009',
+                'WIN'   => '0008,0009',
                 '54'    => '0008,0009',   # ICE id
                 '10a'   => '0005,0010',
                 '10'    => '0010,0005',
+                '10Cap' => '0010,0005',
                 '55'    => '0010,0005',   # ICE id
                 'SBS'   => '0003,1283',
                 '59'    => '0003,1283',   # ICE id
                 'SBS-2' => '0033,1281',
                 'SBSD'  => '0033,1281',
                 '60'    => '0033,1281',   # ICE id
-               );
-                                
-    my $id     = $channel->att('id');
-    my $LCN_id = (split /\./, $id)[2] || $id;  # e.g. freesd.Canberra.2 -> 2
-    my $name   = $channel->first_child('display-name')->text;
-    $channels_ref->{$id} = $LCN{$LCN_id} if (exists $LCN{$LCN_id});
+               };
     
-    $t->purge;
+    return $LCN;    
 }
 
-sub programme {
+sub munge_programme {
     #
-    # parse the programme GI and add to the data structure $programmes_ref
+    # Process the XMLTV data structure 
     #
-    my ($t, $programme) = @_; # all handlers get called with those arguments
-    my ($prog_ref, $gtm_flag);
-    
-    # Get values for the XML fields...
-    $prog_ref->{channel}   = $programme->att('channel');
-    $prog_ref->{start}     = $programme->att('start');
-    $prog_ref->{stop}      = $programme->att('stop');
-    $prog_ref->{title}     = $programme->trimmed_field('title');
-    $prog_ref->{sub_title} = $programme->trimmed_field('sub-title');
-    $prog_ref->{desc}      = $programme->first_child('desc')->xml_text;
-    $prog_ref->{rating}    = $programme->first_child('rating')->first_child('value')->xml_text;
-    $prog_ref->{category}  = $programme->trimmed_field('category');
-   #$prog_ref->{aspect}    = $programme->first_child(qr/video/)->first_child(qr/aspect/)->text;
-    $prog_ref->{subtitles} = ($programme->trimmed_field('subtitles')) ? 2 : 0;
-    
-    # Generate some of the extra "output" fields...    
-    ($prog_ref->{gmt_start},
-     $prog_ref->{duration})  = get_times($prog_ref->{start}, $prog_ref->{stop});
-    $prog_ref->{epg_start}   = encode($prog_ref->{gmt_start});
-    $prog_ref->{title}       = substr(decode_entities($prog_ref->{title}), 0, 39);    # only grab first 30 characters
-    $prog_ref->{sub_title}   = decode_entities($prog_ref->{sub_title});
-    $prog_ref->{desc}        = decode_entities($prog_ref->{desc});
-    $prog_ref->{channel_lcn} = $channels_ref->{$prog_ref->{channel}};
-    $prog_ref->{ice_id}      = (split /\,/, $prog_ref->{channel_lcn})[0] if $prog_ref->{channel_lcn};
-    $prog_ref->{ice_id}      = sprintf("%d", $prog_ref->{ice_id})        if $prog_ref->{channel_lcn};
-    $prog_ref->{event_id}    = get_event_id($prog_ref->{title});
-    $prog_ref->{category}    = category_to_num($prog_ref->{category});
-    $prog_ref->{rating}      = rating_to_num($prog_ref->{rating});
-    
-    push @{ $programmes_ref }, $prog_ref;    # add it to the global array ref
-    #print Dumper("programme", $prog_ref);
-    $t->purge;
+    my ($p_ref) = @_;
+    my ($all_p_ref);
+    my $lcn_ref = get_lcn();    # get the hash ref of LCN mappings
+    #print Dumper("munge_programme", $p_ref );
+
+    for my $p (@{ $p_ref }) {
+        # Get values for the XML fields...
+        #print Dumper($p);
+        my $prog_ref;
+        $prog_ref->{channel}   = $p->{channel};    # attribute
+        $prog_ref->{start}     = $p->{start};      # attribute
+        $prog_ref->{stop}      = $p->{stop};       # attribute
+        $prog_ref->{title}     = (ref $p->{title}->[0] eq "HASH") 
+                                   ? $p->{title}->[0]->{content}    
+                                   : $p->{title}->[0];
+        $prog_ref->{sub_title} = (ref $p->{'sub-title'}->[0] eq "HASH") 
+                                   ? $p->{'sub-title'}->[0]->{content} 
+                                   : $p->{'sub-title'}->[0];
+        $prog_ref->{desc}      = (ref $p->{desc}->[0] eq "HASH") 
+                                   ? $p->{desc}->[0]->{content} 
+                                   : $p->{desc}->[0];
+        $prog_ref->{category}  = (ref $p->{category}->[0] eq "HASH") 
+                                   ? $p->{category}->[0]->{content} 
+                                   : $p->{category}->[0];
+        $prog_ref->{rating}    = $p->{rating}->[0]->{value}->[0];
+       #$prog_ref->{ice_id}    = $p->{'episode-num'}->[0]->{content};
+        $prog_ref->{event_id}  = $p->{'episode-num'}->[0]->{content};
+        $prog_ref->{aspect}    = $p->{video}->[0]->{aspect}->[0];
+        $prog_ref->{subtitles} = $p->{subtitles}->[0]->{type};
+        
+        # Munge values for output...
+        ($prog_ref->{gmt_start},
+         $prog_ref->{duration})  = get_times($prog_ref->{start}, $prog_ref->{stop});
+        $prog_ref->{epg_start}   = encode($prog_ref->{gmt_start});
+        $prog_ref->{title}       = substr($prog_ref->{title}, 0, 39);    # only grab first 39 characters
+        $prog_ref->{sub_title}   = $prog_ref->{sub_title}             if $prog_ref->{sub_title};
+        $prog_ref->{desc}        = $prog_ref->{desc};
+        $prog_ref->{channel}     = (split /\./, $prog_ref->{channel})[2] || $prog_ref->{channel};
+        $prog_ref->{lcn}         = $lcn_ref->{$prog_ref->{channel}};
+        # todo ice_id from data first
+        $prog_ref->{ice_id}      = (split /\,/, $prog_ref->{lcn})[0]  if $prog_ref->{lcn};
+        $prog_ref->{ice_id}      = sprintf("%d", $prog_ref->{ice_id}) if $prog_ref->{lcn};
+        $prog_ref->{event_id}    = ($prog_ref->{event_id}) 
+                                     ? $prog_ref->{event_id}              # IceTV data
+                                     : get_event_id($prog_ref->{title});  # other
+        $prog_ref->{category}    = category_to_num($prog_ref->{category});
+        $prog_ref->{rating}      = rating_to_num($prog_ref->{rating});
+        #print Dumper($prog_ref);
+
+        push @{ $all_p_ref }, $prog_ref;   # add it to the array ref
+    }
+    #print Dumper($all_p_ref);
+    return $all_p_ref;
 }
 
 sub format_EPG {
@@ -127,17 +141,17 @@ sub format_EPG {
     #
     my ($data) = @_;
     my ($epg);
-    
+    #print Dumper($data);
     for my $p (@{ $data }) {
-        next if !$p->{channel_lcn};    # skip channels not defined with LCN
+        next if !$p->{lcn};      # skip channels not defined with LCN
         $epg .= $p->{epg_start}                             . "\t";  # col 1
         $epg .= $p->{ice_id}                                . "\t";  # col 2
-        $epg .= $p->{channel_lcn}                           . "\t";  # col 3
+        $epg .= $p->{lcn}                                   . "\t";  # col 3
         $epg .= $p->{event_id}                              . "\t";  # col 4
         $epg .= $p->{duration}                              . "\t";  # col 5
-        $epg .= ($p->{title})    ? $p->{title}      . "\t" :  "\t";  # col 6
+        $epg .= ($p->{title})     ? $p->{title}     . "\t" :  "\t";  # col 6
         $epg .= ($p->{sub_title}) ? $p->{sub_title} . "\t" :  "\t";  # col 7
-        $epg .= ($p->{category}) ? $p->{category}   . "\t" :  "\t";  # col 8
+        $epg .= ($p->{category})  ? $p->{category}  . "\t" :  "\t";  # col 8
         $epg .= "1\t";                                               # col 9
         $epg .= "1\t";                                               # col 10
         $epg .= "1\t";                                               # col 11
@@ -248,7 +262,7 @@ sub get_event_id {
     #
     my ($title) = @_;
     
-    no warnings ;
+    no warnings;
     my $digest = md5_hex($title);
     my $hex    = hex($digest);
     my $id     = substr $hex, 2, 5;
