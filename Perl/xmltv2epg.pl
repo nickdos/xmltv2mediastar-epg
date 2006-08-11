@@ -48,7 +48,8 @@ sub get_lcn {
     #
     # Channel name to LCN mapping
     #
-    my $LCN = { '2'     => '0002',
+    my $LCN = { # FTA digital channels
+                '2'     => '0002',
                 '57'    => '0002',        # ICE id
                 '2-2'   => '0021',
                 'ABC2'  => '0021',
@@ -68,6 +69,24 @@ sub get_lcn {
                 'SBS-2' => '0033,1281',
                 'SBSD'  => '0033,1281',
                 '60'    => '0033,1281',   # ICE id
+                # SelecTV channels for 820
+                'FashionTV'   => '1286', 
+                'EuroNews'    => '1291',
+                'BBC'         => '1283',
+                'CNNI'        => '1284',
+                'Bloomberg'   => '1288',
+                'Cartoon Net' => '1293',
+                'NGEO'        => '1316',
+                'MTV'         => '1314',
+                'VH1'         => '1321',
+                'TCM'         => '1318',
+                'MOV1'        => '1322', 
+                'MOVX'        => '1323',
+                'MOVG'        => '1315', 
+                'MOV2'        => '1317', 
+                'A1'          => '1325',
+                'E!'          => '1324', 
+                'Ovation'     => '1326',
                };
     
     return $LCN;    
