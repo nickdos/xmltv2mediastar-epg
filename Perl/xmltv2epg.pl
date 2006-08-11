@@ -129,7 +129,7 @@ sub munge_programme {
         ($prog_ref->{gmt_start},
          $prog_ref->{duration})  = get_times($prog_ref->{start}, $prog_ref->{stop});
         $prog_ref->{epg_start}   = encode($prog_ref->{gmt_start});
-        $prog_ref->{title}       = substr($prog_ref->{title}, 0, 39);    # only grab first 39 characters
+        $prog_ref->{title}       = substr($prog_ref->{title}, 0, 30);    # only grab first 39 characters
         $prog_ref->{sub_title}   = $prog_ref->{sub_title}             if $prog_ref->{sub_title};
         $prog_ref->{desc}        = $prog_ref->{desc};
         $prog_ref->{channel}     = (split /\./, $prog_ref->{channel})[2] || $prog_ref->{channel};
@@ -172,60 +172,31 @@ sub format_EPG {
         $epg .= "1\t";                                               # col 12
         $epg .= "1\t";                                               # col 13
         $epg .= ($p->{rating}) ? $p->{rating}       . "\t" :  "\t";  # col 14
-        $epg .= ($p->{desc})   ? $p->{desc}         . "\t" :  "\t";  # col 15
+        $epg .= ($p->{desc})   ? $p->{desc}                :  ""  ;  # col 15
         $epg .= "\n";
     }
     
     return $epg;
 }
 
-sub convert_epg_date {
-    #
-    # Convert unix epoch time to EPG column 1 date format
-    #
-    # gmtime = ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday)
-    # Code 1: 14 digit time code in UTC/GMT (thanks angelrose, dave, and temporary1 :) )
-    # As 2yyymmddhhmm 
-    #  with a=q=0 b=r=1 c=s=2 d=t=3 e=u=4 f=v=5 g=w=6 h=x=7 i=y=8 j=z=9 Upper or lowercase) First '2' is fixed.
-    #
-    my @gmtime = @_;
-    my $epg_data;
-
-    my $YY  = encode(1900 + $gmtime[5]);
-    $YY     = substr $YY, 1, 3;    # 2006 -> 006
-    my $MM  = encode(sprintf "%02d", $gmtime[4] + 1);
-    my $DD  = encode(sprintf "%02d", $gmtime[3]);
-    my $hh  = encode(sprintf "%02d", $gmtime[2]);
-    my $mm  = encode(sprintf "%02d", $gmtime[1]);
-    $epg_data .= "2". $YY . $MM . $DD . $hh . $mm . "a0";
-    
-    if (length $epg_data != 14) {
-        die "Oops, date conversion error: length of $epg_data not 14.\n";
-    }
-    
-    return $epg_data;
-}
-
 sub encode {
     #
-    # encode input number to the text code for EPG
-    # Todo: might need to also use the second encding set ?
+    # Encode input number to the text code for EPG
     #
     my ($input)  = @_;
-    #print "encode 1: $input\n";
     my $output = "";
     my %code   = ( ' ' => 'z', 0 => 'a', 1 => 'b', 2 => 'c', 3 => 'd', 4 => 'e', 
                      5 => 'f', 6 => 'g', 7 => 'h', 8 => 'i', 9 => 'j',
                  );
-    my @digits = split //, $input;
+    my @digits = split //, $input;    # split on every character
     
     for my $i (@digits)  {
-        # substitute the letter code for each number
+        # substitute the letter code for each number and append to $output
         $output .= $code{$i};
     }
     
     if (length $output eq 14) {
-        # if full time is passed, don't code the beginning 2 and last 0
+        # if entire time field is passed in, don't encode the beginning 2 and end 0
         $output =~ s/^./2/;
         $output =~ s/.$/0/;
     }
@@ -242,6 +213,7 @@ sub get_times {
     my ($gmt_time, $is_gmt, $duration);
     
     for my $key (keys %input_time) {
+        # either start or stop
         if ($input_time{$key} =~ /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s+\+(\d{4})/) {
             # e.g. "20060805142000 +0000" or "20060805142000 +1000"
             $dates{$key} = str2time("$1-$2-$3T$4:$5:$6");    # standard internet format
@@ -276,7 +248,6 @@ sub get_event_id {
     # generate a unique id (5 digit int) for a given title via MD5 hash
     #
     my ($title) = @_;
-    
     no warnings;
     my $digest = md5_hex($title);
     my $hex    = hex($digest);
@@ -296,6 +267,7 @@ sub rating_to_num {
     my %ratings = ( 'G' => 0, 'PG' => 9, 'MA' => 12, 'AV' => 15, 'AV' => 18 );
     my $rating = $ratings{$input};
     $output = ($rating) ? $rating: $output;
+    
     return $output;
 }
 
