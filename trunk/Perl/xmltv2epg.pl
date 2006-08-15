@@ -11,13 +11,23 @@ use XML::Simple;
 use Date::Parse;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use POSIX qw(strftime);
+use Getopt::Std;
 use Data::Dumper;
 
-my $EPG_file_name = "ICE_EPG.DAT";
-my $debug = 0;    # print out debugging when set to true (1) 
+my %opts = ();              # hash to store input args
+getopts("dhi:o:t",\%opts); # load the args into %opts
+
+my $input_file    = ($opts{'i'}) ? $opts{'i'} : $ARGV[0];
+my $EPG_file_name = ($opts{'o'}) ? $opts{'o'} : "ICE_EPG.DAT";
+my $debug         = $opts{'d'} if $opts{'d'};    # print out debugging when set to true (1) 
+my $t_offset      = $opts{'t'} if $opts{'t'};
+
+if ((!%opts && ! -r $ARGV[0]) || $opts{'h'}) {
+    usage();
+}
 
 my $xs        = new XML::Simple( ForceArray => 1 );   # ForceArray => 1
-my $xmltv_ref = $xs->XMLin( $ARGV[0] );
+my $xmltv_ref = $xs->XMLin( $input_file );
 
 my $programmes_ref = munge_programme($xmltv_ref->{programme});
 
@@ -50,24 +60,31 @@ sub get_lcn {
     #
     my $LCN = { # FTA digital channels
                 '2'     => '0002',
+                'ABC ACT' => '0002',
+                'ABC-Can' => '0002',
                 '57'    => '0002',        # ICE id
                 '2-2'   => '0021',
                 'ABC2'  => '0021',
                 '58'    => '0021',        # ICE id
                 '7'     => '0006,0007',
                 'PrimS' => '0006,0007',
+                'Prime Southern, Canberra/Wollongong/Sth Coast' => '0006,0007',
                 '56'    => '0006,0007',   # ICE id
                 '9'     => '0008,0009',
                 'WIN'   => '0008,0009',
+                'WIN Television NSW' => '0008,0009',
                 '54'    => '0008,0009',   # ICE id
                 '10a'   => '0005,0010',
                 '10'    => '0010,0005',
                 '10Cap' => '0010,0005',
+                'Southern Cross TEN Capital, Canberra' => '0010,0005',
                 '55'    => '0010,0005',   # ICE id
                 'SBS'   => '0003,1283',
+                'SBS Eastern' => '0003,1283',
                 '59'    => '0003,1283',   # ICE id
                 'SBS-2' => '0033,1281',
                 'SBSD'  => '0033,1281',
+                'SBS News' => '0033,1281',
                 '60'    => '0033,1281',   # ICE id
                 # SelecTV channels for 820
                 'FashionTV'   => '1286', 
@@ -129,9 +146,9 @@ sub munge_programme {
         ($prog_ref->{gmt_start},
          $prog_ref->{duration})  = get_times($prog_ref->{start}, $prog_ref->{stop});
         $prog_ref->{epg_start}   = encode($prog_ref->{gmt_start});
-        $prog_ref->{title}       = substr($prog_ref->{title}, 0, 30);    # only grab first 39 characters
-        $prog_ref->{sub_title}   = $prog_ref->{sub_title}             if $prog_ref->{sub_title};
-        $prog_ref->{desc}        = $prog_ref->{desc};
+        $prog_ref->{title}       = substr($prog_ref->{title}, 0, 30);    # only grab first 30 characters
+        $prog_ref->{sub_title}   = substr($prog_ref->{sub_title}, 0, 500) if $prog_ref->{sub_title};
+        $prog_ref->{desc}        = substr($prog_ref->{desc}, 0, 505) if $prog_ref->{desc};
         $prog_ref->{channel}     = (split /\./, $prog_ref->{channel})[2] || $prog_ref->{channel};
         $prog_ref->{lcn}         = $lcn_ref->{$prog_ref->{channel}};
         $prog_ref->{ice_id}      = (split /\,/, $prog_ref->{lcn})[0]  if $prog_ref->{lcn};
@@ -310,6 +327,25 @@ sub category_to_num {
     return $output;
 }
 
+sub usage {
+    #
+    # print Usage message
+    #
+    my $filename = (split(/\//,$0))[-1];
+	print STDERR << "EOF";
+
+Usage: $filename [-dh] -i input_xmltv_file [-o output_file ]
+
+-h      : this (help) message
+-d      : print debugging messages 
+-i file : input XMLTV file (or filename as only arg to script)
+-o file : output EPG file (default: ICE_EPG.DAT)
+
+example: $filename -i xmltv.xml -o ICE_EPG.ABC.DAT 
+	
+EOF
+exit;
+}
 __DATA__
 <programme channel="freesd.Canberra.2" start="20060731015500" stop="20060731035500">
     <title>Fanny By Gaslight</title>
