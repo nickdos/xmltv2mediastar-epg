@@ -68,21 +68,26 @@ sub get_lcn {
                 '58'    => '0021',        # ICE id
                 '7'     => '0006,0007',
                 'PrimS' => '0006,0007',
+                'Prime-Can' => '0006,0007',
                 'Prime Southern, Canberra/Wollongong/Sth Coast' => '0006,0007',
                 '56'    => '0006,0007',   # ICE id
                 '9'     => '0008,0009',
                 'WIN'   => '0008,0009',
+                'WIN-Can' => '0008,0009',
                 'WIN Television NSW' => '0008,0009',
                 '54'    => '0008,0009',   # ICE id
                 '10a'   => '0005,0010',
                 '10'    => '0010,0005',
+                'Ten-Can' => '0010,0005',
                 '10Cap' => '0010,0005',
                 'Southern Cross TEN Capital, Canberra' => '0010,0005',
                 '55'    => '0010,0005',   # ICE id
                 'SBS'   => '0003,1283',
+                'SBS-Can'   => '0003,1283',
                 'SBS Eastern' => '0003,1283',
                 '59'    => '0003,1283',   # ICE id
                 'SBS-2' => '0033,1281',
+                'SBS-NEWS' => '0033,1281',
                 'SBSD'  => '0033,1281',
                 'SBS News' => '0033,1281',
                 '60'    => '0033,1281',   # ICE id
@@ -149,6 +154,7 @@ sub munge_programme {
         $prog_ref->{title}       = substr($prog_ref->{title}, 0, 30);    # only grab first 30 characters
         $prog_ref->{sub_title}   = substr($prog_ref->{sub_title}, 0, 500) if $prog_ref->{sub_title};
         $prog_ref->{desc}        = substr($prog_ref->{desc}, 0, 505) if $prog_ref->{desc};
+        $prog_ref->{desc}        =~ s/(\r|\n)/ /gsm if $prog_ref->{desc};
         $prog_ref->{channel}     = (split /\./, $prog_ref->{channel})[2] || $prog_ref->{channel};
         $prog_ref->{lcn}         = $lcn_ref->{$prog_ref->{channel}};
         $prog_ref->{ice_id}      = (split /\,/, $prog_ref->{lcn})[0]  if $prog_ref->{lcn};
@@ -240,6 +246,7 @@ sub get_times {
         elsif ($input_time{$key} =~ /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/) {
             # e.g. "20060805142000"
             $dates{$key} = str2time("$1-$2-$3T$4:$5:$6");    # standard internet format
+            $is_gmt = 1;    # hard-coded for http://minnie.tuhs.org/tivo-bin/xmlguide.pl data
         }
         else {
             die "Date format not recognised: $input_time{$key}.\n";
