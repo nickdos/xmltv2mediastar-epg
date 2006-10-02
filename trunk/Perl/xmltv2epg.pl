@@ -28,9 +28,8 @@ if ((!%opts && ! -r $ARGV[0]) || $opts{'h'}) {
 
 my $xs        = new XML::Simple( ForceArray => 1 );   # ForceArray => 1
 my $xmltv_ref = $xs->XMLin( $input_file );
-
-my $programmes_ref = munge_programme($xmltv_ref->{programme});
-
+my $programmes_ref = munge_programme($xmltv_ref);
+#print Dumper("tv_generator", $tv_generator);
 #print Dumper($xmltv_ref) if 1;
 print "Total programmes = ", $#{ $programmes_ref } + 1, "\n";
 
@@ -118,12 +117,14 @@ sub munge_programme {
     #
     # Process the XMLTV data structure 
     #
-    my ($p_ref) = @_;
-    my ($all_p_ref);
+    my ($xmltv_ref)  = @_;
+    my $prog_ref     = $xmltv_ref->{programme};
+    my $tv_generator = $xmltv_ref->{'generator-info-name'};
+	my ($all_p_ref);
     my $lcn_ref = get_lcn();    # get the hash ref of LCN mappings
     #print Dumper("munge_programme", $p_ref );
 
-    for my $p (@{ $p_ref }) {
+    for my $p (@{ $prog_ref }) {
         # Get values for the XML fields...
         my $prog_ref;
         $prog_ref->{channel}   = $p->{channel};    # attribute
@@ -149,7 +150,7 @@ sub munge_programme {
         
         # Munge values for output...
         ($prog_ref->{gmt_start},
-         $prog_ref->{duration})  = get_times($prog_ref->{start}, $prog_ref->{stop});
+         $prog_ref->{duration})  = get_times($prog_ref->{start}, $prog_ref->{stop}, $tv_generator);
         $prog_ref->{epg_start}   = encode($prog_ref->{gmt_start});
         $prog_ref->{title}       = substr($prog_ref->{title}, 0, 30);    # only grab first 30 characters
         $prog_ref->{sub_title}   = substr($prog_ref->{sub_title}, 0, 500) if $prog_ref->{sub_title};
@@ -231,8 +232,8 @@ sub get_times {
     #
     # process the start, stop and durations times
     #
-    my (%input_time, %dates);
-    ($input_time{start}, $input_time{stop}) = @_;
+    my (%input_time, %dates, $tv_generator);
+    ($input_time{start}, $input_time{stop}, $tv_generator) = @_;
     my ($gmt_time, $is_gmt, $duration);
     
     for my $key (keys %input_time) {
@@ -245,8 +246,8 @@ sub get_times {
         }
         elsif ($input_time{$key} =~ /(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/) {
             # e.g. "20060805142000"
-            $dates{$key} = str2time("$1-$2-$3T$4:$5:$6");    # standard internet format
-            $is_gmt = 1;    # hard-coded for http://minnie.tuhs.org/tivo-bin/xmlguide.pl data
+            $dates{$key} = str2time("$1-$2-$3T$4:$5:$6");     # standard internet format
+            $is_gmt = 1 if ($tv_generator =~ /Wktivoguide/i); # for http://minnie.tuhs.org/tivo-bin/xmlguide.pl data
         }
         else {
             die "Date format not recognised: $input_time{$key}.\n";
