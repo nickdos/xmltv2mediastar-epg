@@ -4,7 +4,7 @@
 #
 # copyright (c) 2006 Nick dos Remedios - nick at remedios-cole.id.au
 # 
-# version 0.01, NdR 02 Aug 2006
+# version 0.$Revision$, NdR $Date$
 #
 use strict;
 use XML::Simple;
