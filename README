@@ -8,6 +8,20 @@ DT-920PVR and DT-820PVR.
 The Perl script can be found in the Perl directory. A Java version is planned 
 but has not been written yet.
 
+To use this script, run it via the command line with the XMLTV EPG file as the
+only argument:
+
+$ ./xmltv2epg.pl xmltv.xml
+
+A file called "ICE_EPG.DAT" will be produced in the working directory, which
+can be manually copied to the mediastar PVR (via the USB connection) into the 
+directory called "ICEEPG".
+
+If EPG data for some channels are not appearing on the PVR, it may be necessary
+to edit the xmltv2epg.pl file and add a mapping between the channel id used in 
+xmltv file and the channel numbers (LCN) used for the PVR. See the subroutine
+called "get_lcn". 
+
 copyright (c) 2006 Nick dos Remedios - nickdos at gmail.com
 
 xmltv2mediastar is free software; you can redistribute it and/or modify
