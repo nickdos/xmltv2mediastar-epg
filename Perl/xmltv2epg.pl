@@ -18,7 +18,7 @@
 # along with Cambia Sequence; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 # 
-# Version $Revision$, NdR $Date$
+# $Revision$ $Author$ $Date$
 #
 use strict;
 use XML::Simple;
