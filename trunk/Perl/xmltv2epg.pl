@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Converts XMLTV format to the EPG format for the Medistar PVR.
-#
+# 
 # copyright (c) 2006 Nick dos Remedios - nick at remedios-cole.id.au
 # 
 # xmltv2mediastar is free software; you can redistribute it and/or modify
@@ -40,11 +40,11 @@ if ((!%opts && ! -r $ARGV[0]) || $opts{'h'}) {
     usage();
 }
 
-my $xs        = new XML::Simple( ForceArray => 1 );   # ForceArray => 1
+my $xs        = new XML::Simple( ForceArray => 1, NormaliseSpace => 2 );   # ForceArray => 1
 my $xmltv_ref = $xs->XMLin( $input_file );
 my $programmes_ref = munge_programme($xmltv_ref);
-#print Dumper("tv_generator", $tv_generator);
-#print Dumper($xmltv_ref) if 1;
+
+# print out message to terminal screen
 print "Total programmes = ", $#{ $programmes_ref } + 1, "\n";
 
 # format the data for the output file
@@ -303,9 +303,9 @@ sub rating_to_num {
     my $output = 1;
     $input = uc $input;    # force upper case
     # 0(unrated) 9 (PG) 12 (MA) 15(AV) 18(AV)
-    my %ratings = ( 'G' => 0, 'PG' => 9, 'MA' => 12, 'AV' => 15, 'AV' => 18 );
-    my $rating = $ratings{$input};
-    $output = ($rating) ? $rating: $output;
+    my %ratings = ( 'G' => 7, 'P' => 3, 'C' => 5, 'PG' => 9, 'M' => 11, 'MA' => 13, 'AV' => 15, 'AV' => 18 );
+    my $rating = ($ratings{$input}) ? $ratings{$input} : 0;
+    $output = ($rating) ? $rating : $output;
     
     return $output;
 }
