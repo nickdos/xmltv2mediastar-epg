@@ -21,7 +21,7 @@
 # $Id$
 #
 use strict;
-use XML::Simple;
+use XML::TreePP;
 use Date::Parse;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use POSIX qw(strftime);
@@ -40,8 +40,12 @@ if ((!%opts && ! -r $ARGV[0]) || $opts{'h'}) {
     usage();
 }
 
-my $xs        = new XML::Simple( ForceArray => 1, NormaliseSpace => 2 );   # ForceArray => 1
-my $xmltv_ref = $xs->XMLin( $input_file );
+# Parse the XMLTV file
+my $tpp = XML::TreePP->new();
+$tpp->set( force_array => [ 'category' ] );  # force array ref for some fields
+my $xmltv_ref = $tpp->parsefile( $input_file );
+
+# Normalise the XMLTV data structure (munge it)
 my $programmes_ref = munge_programme($xmltv_ref);
 
 # print out message to terminal screen
@@ -55,7 +59,7 @@ if (-e $EPG_file_name) {
     rename $EPG_file_name, "$EPG_file_name.$$";
 }
 
-# print it to file (in current directory)
+# print it to file (in current directory) UTF-8 uncoding
 #open EPG, "> $EPG_file_name" or die "Can't write to output file $EPG_file_name: $!\n";
 open EPG, ">:utf8", $EPG_file_name or die "Can't write to output file $EPG_file_name: $!\n";
 print EPG $EPG_data, "\n";
@@ -104,7 +108,7 @@ sub get_lcn {
                 'SBSD'  => '0033,1281',
                 'SBS News' => '0033,1281',
                 '60'    => '0033,1281',   # ICE id
-                # SelecTV channels for 820
+                # SelecTV channels for DT-820
                 'FashionTV'   => '1286', 
                 'EuroNews'    => '1291',
                 'BBC'         => '1283',
@@ -132,35 +136,36 @@ sub munge_programme {
     # Process the XMLTV data structure 
     #
     my ($xmltv_ref)  = @_;
-    my $prog_ref     = $xmltv_ref->{programme};
-    my $tv_generator = $xmltv_ref->{'generator-info-name'};
-	my ($all_p_ref);
+    my $prog_ref     = $xmltv_ref->{tv}->{programme};
+    my $tv_generator = $xmltv_ref->{tv}->{'-generator-info-name'};
+    my ($all_p_ref);
     my $lcn_ref = get_lcn();    # get the hash ref of LCN mappings
-    #print Dumper("munge_programme", $p_ref );
+    #print Dumper("munge_programme", $prog_ref );
 
     for my $p (@{ $prog_ref }) {
         # Get values for the XML fields...
         my $prog_ref;
-        $prog_ref->{channel}   = $p->{channel};    # attribute
-        $prog_ref->{start}     = $p->{start};      # attribute
-        $prog_ref->{stop}      = $p->{stop};       # attribute
-        $prog_ref->{title}     = (ref $p->{title}->[0] eq "HASH") 
-                                   ? $p->{title}->[0]->{content}    
-                                   : $p->{title}->[0];
-        $prog_ref->{sub_title} = (ref $p->{'sub-title'}->[0] eq "HASH") 
-                                   ? $p->{'sub-title'}->[0]->{content} 
-                                   : $p->{'sub-title'}->[0];
-        $prog_ref->{desc}      = (ref $p->{desc}->[0] eq "HASH") 
-                                   ? $p->{desc}->[0]->{content} 
-                                   : $p->{desc}->[0];
-        $prog_ref->{category}  = (ref $p->{category}->[0] eq "HASH") 
-                                   ? $p->{category}->[0]->{content} 
+        $prog_ref->{channel}   = $p->{-channel};    # attribute
+        $prog_ref->{start}     = $p->{-start};      # attribute
+        $prog_ref->{stop}      = $p->{-stop};       # attribute
+        $prog_ref->{title}     = (ref $p->{title} eq "HASH") 
+                                   ? $p->{title}->{content}    
+                                   : $p->{title};
+        $prog_ref->{sub_title} = (ref $p->{'sub-title'} eq "HASH") 
+                                   ? $p->{'sub-title'}->{content} 
+                                   : $p->{'sub-title'};
+        $prog_ref->{desc}      = (ref $p->{desc} eq "HASH") 
+                                   ? $p->{desc}->{content} 
+                                   : $p->{desc};
+        $prog_ref->{category}  = (ref $p->{category} eq "HASH") 
+                                   ? $p->{category}->{content} 
                                    : $p->{category}->[0];
-        $prog_ref->{rating}    = $p->{rating}->[0]->{value}->[0];
+        
+        $prog_ref->{rating}    = $p->{rating}->{value};
        #$prog_ref->{ice_id}    = $p->{'episode-num'}->[0]->{content};
-        $prog_ref->{event_id}  = $p->{'episode-num'}->[0]->{content};
-        $prog_ref->{aspect}    = $p->{video}->[0]->{aspect}->[0];
-        $prog_ref->{subtitles} = $p->{subtitles}->[0]->{type};
+        $prog_ref->{event_id}  = $p->{'episode-num'}->{content};
+        $prog_ref->{aspect}    = $p->{video}->{aspect};
+        $prog_ref->{subtitles} = $p->{subtitles}->{type};
         
         # Munge values for output...
         ($prog_ref->{gmt_start},
@@ -314,9 +319,11 @@ sub category_to_num {
     #
     # Map descriptive sections to integers - not used
     #
+    # TODO - work out how to handle multiple categories (can Mediastar?)
+    #
     my ($input) = @_;
     my $output = 1;
-    $input = lc $input;    # force upper case
+    $input = lc $input;    # force lower case
     # Categories - ETSI EN 300 468 V1.7.1 table 28
     # http://webapp.etsi.org/action/OP/OP20060428/en_300468v010701o.pdf
     # combined fields 1 & 2 as hex
