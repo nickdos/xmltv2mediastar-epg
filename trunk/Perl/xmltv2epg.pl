@@ -4,6 +4,8 @@
 # 
 # copyright (c) 2006 Nick dos Remedios - nick at remedios-cole.id.au
 # 
+# Project home: http://code.google.com/p/xmltv2mediastar-epg/
+#
 # xmltv2mediastar is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 2 of the License, or
