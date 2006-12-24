@@ -1,0 +1,10 @@
+#summary xml2mediastar-epg wiki home page
+
+= Introduction =
+
+Welcome to the xml2mediastar-epg wiki. 
+
+
+= Details =
+
+Just starting the wiki... content coming soon.
