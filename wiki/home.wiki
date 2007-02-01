@@ -14,10 +14,10 @@ The Perl script requires the following pre-requisites:
 - Date::Parse module from cpan.org (cmd: cpan -i Date::Parse)
 
 To run the script via the command line:
-
+{{{
   $ ./xmltv2epg.pl xmltv.xml
-  
-where xmltv.xml is the input XMLTV file containing TV guide data. An output file is created with the file name "ICE_EPG.DAT". Copy this file into the "ICEEPG" directory on your PVR.
+}}} 
+where xmltv.xml is the input XMLTV file containing TV guide data. An output file is created with the file name "ICE_EPG.DAT". Copy this file into the "/PVR/ICEEPG" directory on your PVR.
 
 Sources for XMLTV data in Australia can be found on:
 
