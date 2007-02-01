@@ -9,9 +9,9 @@ DT-920PVR, DT-820PVR and Arion 9300 PVR.
 
 The Perl script requires the following pre-requisites:
 
-  • Perl 5.6 or later (Windows users try ActivePerl)
-  • XML::TreePP module from cpan.org (cmd: cpan -i XML::TreePP)
-  • Date::Parse module from cpan.org (cmd: cpan -i Date::Parse)
+  * Perl 5.6 or later (Windows users try ActivePerl)
+  * XML::TreePP module from cpan.org (cmd: cpan -i XML::TreePP)
+  * Date::Parse module from cpan.org (cmd: cpan -i Date::Parse)
 
 To run the script via the command line:
 {{{
