@@ -30,15 +30,17 @@ use POSIX qw(strftime);
 use Getopt::Std;
 use Data::Dumper;
 
+# Process command line arguments
 my %opts = ();              # hash to store input args
-getopts("dhi:o:t",\%opts); # load the args into %opts
-
+getopts("dqhi:o:t",\%opts); # load the args into %opts
 my $input_file    = ($opts{'i'}) ? $opts{'i'} : $ARGV[0];
 my $EPG_file_name = ($opts{'o'}) ? $opts{'o'} : "ICE_EPG.DAT";
-my $debug         = $opts{'d'} if $opts{'d'};    # print out debugging when set to true (1) 
-my $t_offset      = $opts{'t'} if $opts{'t'};
+my $debug         =  $opts{'d'} if $opts{'d'};    # print out debugging when set to true (1) 
+my $t_offset      =  $opts{'t'} if $opts{'t'};
+my $quiet_mode    =  $opts{'q'} if $opts{'q'};
 
 if ((!%opts && ! -r $ARGV[0]) || $opts{'h'}) {
+    # Print usage message
     usage();
 }
 
@@ -51,7 +53,9 @@ my $xmltv_ref = $tpp->parsefile( $input_file );
 my $programmes_ref = munge_programme($xmltv_ref);
 
 # print out message to terminal screen
-print "Total programmes = ", $#{ $programmes_ref } + 1, "\n";
+if (!$quiet_mode) {
+    print "Total programmes = ", $#{ $programmes_ref } + 1, "\n";
+}
 
 # format the data for the output file
 my $EPG_data = format_EPG($programmes_ref);
@@ -369,6 +373,7 @@ Usage: $filename [-dh] -i input_xmltv_file [-o output_file ]
 
 -h      : this (help) message
 -d      : print debugging messages 
+-q      : quiet mode (no STDOUT messages)
 -i file : input XMLTV file (or filename as only arg to script)
 -o file : output EPG file (default: ICE_EPG.DAT)
 
