@@ -35,9 +35,9 @@ my %opts = ();              # hash to store input args
 getopts("dqhi:o:t",\%opts); # load the args into %opts
 my $input_file    = ($opts{'i'}) ? $opts{'i'} : $ARGV[0];
 my $EPG_file_name = ($opts{'o'}) ? $opts{'o'} : "ICE_EPG.DAT";
-my $debug         =  $opts{'d'} if $opts{'d'};    # print out debugging when set to true (1) 
-my $t_offset      =  $opts{'t'} if $opts{'t'};
-my $quiet_mode    =  $opts{'q'} if $opts{'q'};
+my $debug         = ($opts{'d'}) ? $opts{'d'} : "";    # print out debugging when set to true (1) 
+my $t_offset      = ($opts{'t'}) ? $opts{'t'} : "";
+my $quiet_mode    = ($opts{'q'}) ? $opts{'q'} : "";
 
 if ((!%opts && ! -r $ARGV[0]) || $opts{'h'}) {
     # Print usage message
@@ -67,9 +67,9 @@ if (-e $EPG_file_name) {
 
 # print it to file (in current directory) UTF-8 uncoding
 #open EPG, "> $EPG_file_name" or die "Can't write to output file $EPG_file_name: $!\n";
-open EPG, ">:utf8", $EPG_file_name or die "Can't write to output file $EPG_file_name: $!\n";
-print EPG $EPG_data, "\n";
-close EPG or die "Can't close EPG filehandle: $!\n";
+open my($epg), ">:utf8", $EPG_file_name or die "Can't write to output file $EPG_file_name: $!\n";
+print $epg $EPG_data, "\n";
+close $epg or die "Can't close EPG filehandle: $!\n";
 
 ###############################################################################
 #
@@ -244,7 +244,7 @@ sub encode {
         $output .= $code{$i};
     }
     
-    if (length $output eq 14) {
+    if (length $output == 14) {
         # if entire time field is passed in, don't encode the beginning 2 and end 0
         $output =~ s/^./2/;
         $output =~ s/.$/0/;
