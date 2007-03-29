@@ -5,11 +5,12 @@
 
 This project started with a single Perl script that converts XMLTV data to
 the EPG (electronic programme guide) data file format used by the Mediastar 
-DT-920PVR, DT-820PVR and Arion 9300 PVR.
+DT-920PVR, DT-820PVR and Arion 9300 PVR. Windows users may want to first try the
+[http://pvr-tools.com/ PVR-Tools converter] (Win-32 executable - easier to install).
 
 The Perl script requires the following pre-requisites:
 
-  * Perl 5.6 or later (Windows users try ActivePerl)
+  * Perl 5.6 or later (Windows users try [http://www.activestate.com/Products/ActivePerl/ ActivePerl])
   * XML::TreePP module from cpan.org (cmd: cpan -i XML::TreePP)
   * Date::Parse module from cpan.org (cmd: cpan -i Date::Parse)
 
@@ -29,3 +30,5 @@ version 2.
 SVN repository: http://code.google.com/p/xmltv2mediastar-epg/
 
 Nick dos Remedios (nickdos at gmail.com), August 2006.
+
+
