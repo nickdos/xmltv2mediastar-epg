@@ -23,12 +23,14 @@
 # $Id$
 #
 use strict;
-use XML::TreePP;
-use Date::Parse;
 use Digest::MD5 qw(md5 md5_hex md5_base64);
 use POSIX qw(strftime);
 use Getopt::Std;
 use Data::Dumper;
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use XML::TreePP;
+use Date::Parse;
 
 # Process command line arguments
 my %opts = ();              # hash to store input args
@@ -377,7 +379,7 @@ Usage: $filename [-dh] -i input_xmltv_file [-o output_file ]
 -i file : input XMLTV file (or filename as only arg to script)
 -o file : output EPG file (default: ICE_EPG.DAT)
 
-example: $filename -i xmltv.xml -o ICE_EPG.ABC.DAT 
+example: $filename -i xmltv.xml -o ICE_EPG.DAT 
 	
 EOF
 exit;
