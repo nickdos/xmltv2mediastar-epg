@@ -11,8 +11,6 @@ DT-920PVR, DT-820PVR and Arion 9300 PVR. Windows users may want to first try the
 The Perl script requires the following pre-requisites:
 
   * Perl 5.6 or later (Windows users try [http://www.activestate.com/Products/ActivePerl/ ActivePerl])
-  * XML::TreePP module from cpan.org (cmd: cpan -i XML::TreePP)
-  * Date::Parse module from cpan.org (cmd: cpan -i Date::Parse)
 
 To run the script via the command line:
 {{{
@@ -27,8 +25,4 @@ Sources for XMLTV data in Australia can be found on:
 This software is made freely available under the Gnu Public License (GPL) 
 version 2.
 
-SVN repository: http://code.google.com/p/xmltv2mediastar-epg/
-
 Nick dos Remedios (nickdos at gmail.com), August 2006.
-
-
